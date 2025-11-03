@@ -4,7 +4,8 @@ from .models import Post
 from .forms import PostForm
 from rest_framework import viewsets
 from .serializers import PostSerializer
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_200_OK
 from django.contrib.auth import authenticate
@@ -47,28 +48,41 @@ def post_edit(request, pk):
     return render(request, 'blog/post_edit.html', {'form': form})
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def login(request):
     """
     Authenticate user with username/password and return token
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"Login request received. Content-Type: {request.content_type}")
+    logger.info(f"Request data: {request.data}")
+
     username = request.data.get('username')
     password = request.data.get('password')
 
+    logger.info(f"Username: {username}, Password: {'***' if password else 'None'}")
+
     if not username or not password:
+        logger.warning(f"Missing credentials - username: {username}, password: {bool(password)}")
         return Response(
             {'error': 'Username and password required'},
             status=HTTP_400_BAD_REQUEST
         )
 
     user = authenticate(username=username, password=password)
+    logger.info(f"Authenticate result: {user}")
 
     if user is None:
+        logger.warning(f"Authentication failed for username: {username}")
         return Response(
             {'error': 'Invalid credentials'},
             status=HTTP_401_UNAUTHORIZED
         )
 
     token, created = Token.objects.get_or_create(user=user)
+    logger.info(f"Login successful for {username}. Token: {token.key[:10]}...")
     return Response(
         {'token': token.key},
         status=HTTP_200_OK
